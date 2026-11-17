@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Unit tests (no dependencies to install)
+        run: npm test
+
+  syntax:
+    name: syntax + JSON validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: node --check every JavaScript file
+        run: |
+          set -e
+          count=0
+          for f in $(git ls-files '*.js'); do
+            node --check "$f"
+            count=$((count + 1))
+          done
+          echo "checked $count JavaScript files"
+      - name: Validate every JSON file
+        run: |
+          set -e
+          for f in $(git ls-files '*.json'); do
+            node -e "JSON.parse(require('node:fs').readFileSync(process.argv[1],'utf8'))" "$f"
+            echo "OK $f"
+          done
+      - name: Ensure no .env or data/ is tracked
+        run: |
+          set -e
+          if git ls-files | grep -E '^(data/|\.env$)' ; then
+            echo "::error::runtime artefacts must not be committed"; exit 1
+          fi
+          echo "working tree is clean of runtime artefacts"
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: google-reviews-embed:ci
+      - name: Smoke test — container answers /healthz
+        run: |
+          docker run -d --name gre -e GOOGLE_MAPS_API_KEY=dummy \
+            -v "$PWD/businesses.example.json:/app/businesses.json:ro" \
+            -p 8787:8787 google-reviews-embed:ci
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8787/healthz; then ok=1; break; fi
+            sleep 1
+          done
+          docker logs gre
+          test "${ok:-0}" = "1"
+          curl -fsS http://127.0.0.1:8787/api/businesses
+          docker rm -f gre

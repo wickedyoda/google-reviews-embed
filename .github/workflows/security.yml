@@ -1,0 +1,113 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"   # weekly, Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Static analysis of the JavaScript itself (CodeQL: injection, prototype
+  # pollution, unsafe URL handling, regex DoS, credential leaks ...).
+  codeql:
+    name: codeql (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
+  # Trivy: secrets, dependency CVEs, Dockerfile/IaC misconfiguration, plus the
+  # built container image (OS packages). SARIF goes to the Security tab.
+  trivy:
+    name: trivy (repo + image)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan repository (secrets, misconfig, CVEs)
+        run: |
+          mkdir -p reports
+          docker run --rm -v "$PWD:/src" -v "$PWD/reports:/reports" aquasec/trivy:latest \
+            fs --scanners vuln,secret,misconfig \
+               --severity CRITICAL,HIGH \
+               --ignore-unfixed \
+               --format sarif --output /reports/trivy-fs.sarif /src
+
+      - name: Upload repository SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/trivy-fs.sarif
+          category: trivy-fs
+
+      - name: Fail on CRITICAL/HIGH findings in the repo
+        run: |
+          docker run --rm -v "$PWD:/src" aquasec/trivy:latest \
+            fs --scanners vuln,secret,misconfig \
+               --severity CRITICAL,HIGH --ignore-unfixed \
+               --exit-code 1 --quiet /src
+
+      - name: Build image for scanning
+        run: docker build -t google-reviews-embed:scan .
+
+      - name: Scan the container image
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/reports:/reports" \
+            aquasec/trivy:latest \
+            image --severity CRITICAL,HIGH --ignore-unfixed \
+                  --format sarif --output /reports/trivy-image.sarif \
+                  google-reviews-embed:scan
+
+      - name: Upload image SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/trivy-image.sarif
+          category: trivy-image
+
+      - name: Fail on CRITICAL/HIGH findings in the image
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest \
+            image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --quiet \
+                  google-reviews-embed:scan
+
+  # Cheap belt-and-braces check: no committed key can ever look like the real one.
+  secret-guard:
+    name: secret guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject anything resembling a Google API key
+        run: |
+          set +e
+          hits=$(git grep -nE 'AIza[0-9A-Za-z_-]{35}' -- . ':!*.md' ':!package-lock.json' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Possible Google API key committed:"; echo "$hits"; exit 1
+          fi
+          echo "no Google-format keys found"

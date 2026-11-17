@@ -1,0 +1,16 @@
+{
+  "name": "google-reviews-embed",
+  "version": "1.0.0",
+  "description": "Fetch Google reviews server-side via the Places API (New) and embed them on any site.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/"
+  },
+  "files": ["src", "public", "docs", "README.md", "LICENSE"],
+  "keywords": ["google-reviews", "places-api", "embed", "widget", "reviews"],
+  "repository": { "type": "git", "url": "git+https://github.com/wickedyoda/google-reviews-embed.git" }
+}

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Google Reviews embed — demo</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: #f6f7f9; color: #1f2328; }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 1.6rem; margin: 0 0 6px; }
+  h2 { font-size: 1.1rem; margin: 34px 0 12px; }
+  p.lede { color: #5b6570; margin: 0 0 24px; }
+  .panel { background: #fff; border: 1px solid #e6e8eb; border-radius: 16px; padding: 22px; margin-bottom: 20px; }
+  .panel--dark { background: #0f1216; border-color: #23282f; }
+  code { background: #eef0f3; padding: 2px 6px; border-radius: 5px; font-size: .9em; }
+  pre { background: #0f1216; color: #e8eaed; padding: 16px; border-radius: 12px; overflow: auto; }
+  .slug { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #5b6570; font-size: .85rem; }
+  .empty { color: #5b6570; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Google Reviews embed</h1>
+  <p class="lede">
+    One proxy, many businesses. Every widget below is driven by its own
+    <code>business</code> slug and shares the same cached API layer.
+  </p>
+
+  <div id="widgets"></div>
+
+  <h2>Embed code</h2>
+  <pre>&lt;script src="https://reviews.example.com/embed.js" defer&gt;&lt;/script&gt;
+
+&lt;!-- one widget per business --&gt;
+&lt;google-reviews business="moms-originals" limit="3"&gt;&lt;/google-reviews&gt;
+&lt;google-reviews business="second-shop" limit="3" theme="dark"&gt;&lt;/google-reviews&gt;</pre>
+
+  <h2>Single business, dark theme</h2>
+  <div class="panel panel--dark">
+    <google-reviews business="moms-originals" theme="dark" limit="2"></google-reviews>
+  </div>
+</main>
+
+<script src="/embed.js" defer></script>
+<script>
+  // Populate one widget per configured business straight from the registry.
+  (async () => {
+    const host = document.getElementById("widgets");
+    try {
+      const res = await fetch("/api/businesses");
+      const { businesses } = await res.json();
+      if (!businesses?.length) {
+        host.innerHTML = '<p class="empty">No businesses configured. Add entries to businesses.json.</p>';
+        return;
+      }
+      for (const b of businesses) {
+        const panel = document.createElement("div");
+        panel.className = "panel";
+        const slug = document.createElement("p");
+        slug.className = "slug";
+        slug.textContent = `business="${b.slug}"`;
+        const widget = document.createElement("google-reviews");
+        widget.setAttribute("business", b.slug);
+        widget.setAttribute("limit", "3");
+        panel.append(slug, widget);
+        host.appendChild(panel);
+      }
+    } catch (err) {
+      host.innerHTML = '<p class="empty">Could not load the business list.</p>';
+    }
+  })();
+</script>
+</body>
+</html>

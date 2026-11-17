@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy to businesses.json (or mount one). Place IDs are public; API keys do NOT belong here.",
+  "businesses": {
+    "moms-originals": {
+      "placeId": "REPLACE_WITH_GOOGLE_PLACE_ID",
+      "label": "Moms Originals",
+      "language": "en",
+      "region": "US"
+    }
+  }
+}
