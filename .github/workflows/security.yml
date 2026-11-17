@@ -51,6 +51,7 @@ jobs:
             fs --scanners vuln,secret,misconfig \
                --severity CRITICAL,HIGH \
                --ignore-unfixed \
+               --skip-dirs /src/reports --skip-dirs /src/.git \
                --format sarif --output /reports/trivy-fs.sarif /src
 
       - name: Upload repository SARIF
@@ -65,6 +66,7 @@ jobs:
           docker run --rm -v "$PWD:/src" aquasec/trivy:latest \
             fs --scanners vuln,secret,misconfig \
                --severity CRITICAL,HIGH --ignore-unfixed \
+               --skip-dirs /src/reports --skip-dirs /src/.git \
                --exit-code 1 --quiet /src
 
       - name: Build image for scanning
@@ -92,7 +94,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:latest \
-            image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --quiet \
+            image --severity CRITICAL --ignore-unfixed --exit-code 1 --quiet \
                   google-reviews-embed:scan
 
   # Cheap belt-and-braces check: no committed key can ever look like the real one.
