@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Zero runtime dependencies: no npm install, no build stage needed.
-FROM node:22-alpine
+FROM node:26-alpine
 
 LABEL org.opencontainers.image.title="google-reviews-embed" \
       org.opencontainers.image.description="Self-hosted Google reviews proxy and embeddable widget" \
