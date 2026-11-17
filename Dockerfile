@@ -18,6 +18,12 @@ COPY src ./src
 COPY public ./public
 COPY businesses.example.json ./
 
+# Runtime needs only the node binary: this service has zero dependencies, so
+# npm/npx/corepack are removed (smaller image, fewer CVEs, smaller attack surface).
+RUN rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+
 # Run unprivileged; the cache lives in a volume-backed directory.
 RUN addgroup -g 10001 -S app \
  && adduser -u 10001 -S -G app app \
