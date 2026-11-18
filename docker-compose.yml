@@ -1,0 +1,48 @@
+# docker compose for google-reviews-embed
+#
+#   cp businesses.example.json businesses.json   # then add real place IDs
+#   cp .env.example .env                         # then set GOOGLE_MAPS_API_KEY
+#   docker compose up -d
+#
+# The service itself listens on 8787 inside the container; set HOST_PORT to publish
+# a different port on the host.
+
+services:
+  reviews:
+    image: ghcr.io/wickedyoda/google-reviews-embed:${IMAGE_TAG:-latest}
+    # To build from this checkout instead of the published image, uncomment:
+    # build: .
+    container_name: google-reviews-embed
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    ports:
+      - "${HOST_PORT:-8787}:8787"
+
+    volumes:
+      # Registry is mounted read-only: the service never writes to it.
+      - ./businesses.json:/app/businesses.json:ro
+      # Review cache — the only stateful directory.
+      - reviews-data:/app/data
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 4s
+      retries: 3
+      start_period: 5s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+volumes:
+  reviews-data:
